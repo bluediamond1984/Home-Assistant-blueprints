@@ -1,0 +1,60 @@
+blueprint:
+  name: SwitchBot Dual Motor Open
+  description: Long curtain (>3m) needs 2 motors and work in sync
+  author: BlueDiamond
+  domain: script
+
+  input:
+    cover_id_master:
+      name: Curtain master
+      description: At the end of the curtain, traveling the most distance
+      selector:
+        entity:
+          domain: cover
+          device_class: curtain
+    cover_id_slave:
+      name: Curtain slave
+      description: At the middle of the curtain, traveling the lowest distance
+      selector:
+        entity:
+          domain: cover
+          device_class: curtain
+    delay_time:
+      name: Delay time
+      description: Delay time to activate slave (default = 0.5)
+      selector:
+        number:
+          min: 0
+          max: 10
+          step: 0.5
+          mode: slider
+          unit_of_measurement: sec
+      default: 0.5
+
+mode: single
+
+variables:
+  delay_time: !input delay_time
+
+sequence:
+  - if:
+      - condition: numeric_state
+        entity_id: !input cover_id_master
+        below: 2
+        attribute: current_position
+    then:
+      - service: cover.open_cover
+        target:
+          entity_id: !input cover_id_master
+      - delay:
+          seconds: "{{ delay_time }}" 
+      - service: cover.open_cover
+        target:
+          entity_id: !input cover_id_slave
+    else:
+      - service: cover.open_cover
+        target:
+          entity_id:
+            - !input cover_id_master
+            - !input cover_id_slave
+ 
