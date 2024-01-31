@@ -1,0 +1,91 @@
+blueprint:
+  name: Window Open Notify Winter
+  description: When window is open to long in winter, and timer has elapsed when outside temperature is below threshold, or room temperature has become below threshold, then send notification
+  author: BlueDiamond
+  domain: automation
+  
+  input:
+    window_entity:
+      name: Window Sensor
+      description: The window sensor that will control the climate entity
+      selector:
+        entity:
+          domain: binary_sensor
+          device_class: window
+    climate_entity:
+      name: Climate Device
+      description: The climate entity that is controlled by the window sensor
+      selector:
+        entity:
+          domain: climate
+    min_room_temperature:
+      name: Minimum room temperature
+      description: Notify threshold for low room temperature
+      default: 17
+      selector:
+        number:
+          min: 5.0
+          max: 31.0
+          unit_of_measurement: °C
+          mode: slider
+          step: 0.5
+
+mode: restart
+
+variables:
+  window_entity: !input window_entity
+
+trigger:
+  # Window state changes
+  - platform: state
+    entity_id: !input window_entity
+  # Room temperature below threshold
+  - platform: numeric_state
+    entity_id: !input climate_entity
+    attribute: current_temperature
+    below: !input min_room_temperature
+
+condition:
+  - condition: state
+    entity_id: input_boolean.weather_summer
+    state: 'off'
+  - condition: state
+    entity_id: !input window_entity
+    state: 'on'
+
+action:
+  - choose:
+    # Outside temperature below threshold
+    - conditions:
+      - condition: numeric_state
+        entity_id: sensor.boiler_outside_temperature
+        # attribute: temperature
+        below: input_number.weather_window_low_temperature
+      sequence:
+        - delay:
+            minutes: "{{ states('input_number.window_open_time')|float(0.25) * 60 |int(0) }}"
+    # Room temperature below threshold
+    - conditions:
+      - condition: numeric_state
+        entity_id: !input climate_entity
+        attribute: current_temperature
+        below: !input min_room_temperature
+      sequence: []
+    # Do nothing
+    default:
+      - stop: No option choosen
+        error: true
+  # When window is closed scripts is restarted, but doesn't work properly (bug?) Shouldn't be necessary
+  - condition: state
+    entity_id: !input window_entity
+    state: 'on'
+  # send notification
+  - service: notify.window
+    data:
+      title: 'Herinnering: raam open'
+      message: "{{ states[window_entity].name }} sluiten om energie te besparen"
+      # message: "Raam staat nog open"
+      data:
+        tag: "{{ states[window_entity].entity_id }}"
+        push:
+          sound: "sms-received1.caf"

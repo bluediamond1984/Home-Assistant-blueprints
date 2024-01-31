@@ -1,0 +1,86 @@
+# based on: https://community.home-assistant.io/t/homematic-ip-local-reduce-room-temperature-when-a-window-or-door-is-opened
+blueprint:
+  name: Window Open/Close, Notify ramses_cc
+  description: When window open, notify ramses_cc to go off. When window close, notify ramses_cc to return to program
+  author: BlueDiamond
+  domain: automation
+  input:
+    window_entity:
+      name: Window Sensor
+      description: The window sensor that will control the climate entity
+      selector:
+        entity:
+          domain: binary_sensor
+          device_class: window
+    open_delay:
+      name: Windows Open Wait Time
+      description: Time to delay after window opens before notifying ramses_cc
+      default: 30
+      selector:
+        number:
+          min: 0.0
+          max: 600.0
+          unit_of_measurement: seconds
+          mode: slider
+          step: 1.0
+    blocking_entity:
+      name: (OPTIONAL) Blocking Entity
+      description: If this entity's state is on, it will prevent the automation from
+        running. E.g. summer mode or away mode
+      default:
+      selector:
+        entity:
+          domain: input_boolean
+    climate_entity:
+      name: Climate Device
+      description: The climate entity that is controlled by the window sensor
+      selector:
+        entity:
+          domain: climate
+    heating_low_entity:
+      name: Temperature off
+      description: Off temperature of the room
+      default: 5
+      selector:
+        number:
+          min: 5.0
+          max: 31.0
+          unit_of_measurement: °C
+          mode: slider
+          step: 0.5
+variables:
+  blocking_entity: !input blocking_entity
+trigger:
+- platform: state
+  entity_id: !input window_entity
+  for: !input open_delay
+condition:
+- condition: template
+  value_template: '{{ (blocking_entity == none) or (states[blocking_entity].state
+    == ''off'') }}'
+action:
+- choose:
+  - conditions:
+    - condition: state
+      entity_id: !input window_entity
+      state: 'on'
+    sequence:
+      - service: ramses_cc.set_zone_mode
+        data:
+          entity_id: !input climate_entity
+          mode: permanent_override
+          setpoint: !input heating_low_entity
+  - conditions:
+    - condition: state
+      entity_id: !input window_entity
+      state: 'off'
+    sequence:
+      - service: ramses_cc.reset_zone_mode
+        data:
+          entity_id: !input climate_entity
+  default:
+    - service: ramses_cc.reset_zone_mode
+      data:
+        entity_id: !input climate_entity
+mode: restart
+max_exceeded: silent

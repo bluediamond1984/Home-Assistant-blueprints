@@ -1,0 +1,43 @@
+blueprint:
+  name: Light switch-off timer
+  description: When the light comes on, a timer switches the light off
+  author: BlueDiamond
+  ### uses global values:
+  # binary_sensor.lights_turn_off_limit
+  # input_number.lights_turn_off_delay
+  domain: automation
+  input:
+    light_target:
+      name: "Light entity"
+      selector:
+        entity:
+          domain: light
+    delay_target:
+      name: "Delay timer"
+      description: "Override value. Leave blank to use default input_number.lights_turn_off_delay"
+      selector:
+        number:
+          min: 10
+          max: 60
+          step: 1
+          mode: slider
+          unit_of_measurement: "min"
+      default: '{{ states("input_number.lights_turn_off_delay") | int }}'
+mode: restart
+
+trigger:
+- platform: state
+  entity_id: !input light_target
+  to: "on"
+- platform: state
+  entity_id: binary_sensor.lights_turn_off_limit
+  to: 'on'
+condition:
+  - condition: state
+    entity_id: binary_sensor.lights_turn_off_limit
+    state: 'on'
+action:
+- delay:
+    minutes: !input delay_target
+- service: homeassistant.turn_off
+  entity_id: !input light_target
