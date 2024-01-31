@@ -1,0 +1,70 @@
+blueprint:
+  name: SwitchBot Dual Motor Close
+  description: Long curtain (>3m) needs 2 motors and work in sync
+  author: BlueDiamond
+  domain: script
+
+  input:
+    cover_id_master:
+      name: Curtain master
+      description: At the end of the curtain, traveling the most distance
+      selector:
+        entity:
+          domain: cover
+          device_class: curtain
+    cover_id_slave:
+      name: Curtain slave
+      description: At the middle of the curtain, traveling the lowest distance
+      selector:
+        entity:
+          domain: cover
+          device_class: curtain
+    position_master_mid_high:
+      name: Position master to wait
+      description: Use timer when above this position
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 1
+          mode: slider
+      default: 70
+    time_to_wait:
+      name: Time to wait
+      selector:
+        number:
+          min: 0
+          max: 30
+          step: 1
+          mode: slider
+          unit_of_measurement: sec
+      default: 5
+
+mode: single
+
+variables:
+  cover_id_master: !input cover_id_master
+  position_master_mid_high: !input position_master_mid_high
+  time_to_wait: !input time_to_wait
+
+sequence:
+  - if:
+      - condition: template
+        value_template: "{{ state_attr(cover_id_master,'current_position') > position_master_mid_high }}"
+    then:
+      - service: cover.close_cover
+        target:
+          entity_id:
+            - !input cover_id_master
+      - delay:
+          seconds: "{{ time_to_wait }}"
+      - service: cover.close_cover
+        target:
+          entity_id:
+            - !input cover_id_slave
+    else:
+      - service: cover.close_cover
+        target:
+          entity_id:
+            - !input cover_id_master
+            - !input cover_id_slave
