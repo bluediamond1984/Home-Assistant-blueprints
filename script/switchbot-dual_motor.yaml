@@ -28,6 +28,7 @@ blueprint:
           max: 100
           step: 1
           mode: slider
+          unit_of_measurement: "%"
     position_master_mid_high:
       name: Master mid high
       description: Nearest master position when slave is fully closed (0)
@@ -37,6 +38,7 @@ blueprint:
           max: 100
           step: 1
           mode: slider
+          unit_of_measurement: "%"
     delay_time_opening:
       name: Slave open delay time
       description: Delay time to activate slave when fully closed (default=0.5)
