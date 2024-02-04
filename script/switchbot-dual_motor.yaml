@@ -1,0 +1,206 @@
+blueprint:
+  name: SwitchBot Dual Motor
+  description: Long curtain (>3m) needs 2 motors and work in sync
+  author: BlueDiamond
+  domain: script
+
+  input:
+    cover_id_master:
+      name: Curtain master
+      description: At the end of the curtain, traveling the most distance
+      selector:
+        entity:
+          domain: cover
+          device_class: curtain
+    cover_id_slave:
+      name: Curtain slave
+      description: At the middle of the curtain, traveling the lowest distance
+      selector:
+        entity:
+          domain: cover
+          device_class: curtain
+    position_master_mid_low:
+      name: Master mid low
+      description: Furthest master position when slave is fully open (100)
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 1
+          mode: slider
+    position_master_mid_high:
+      name: Master mid high
+      description: Nearest master position when slave is fully closed (0)
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 1
+          mode: slider
+    delay_time_opening:
+      name: Slave open delay time
+      description: Delay time to activate slave when fully closed (default=0.5)
+      selector:
+        number:
+          min: 0
+          max: 10
+          step: 0.5
+          mode: slider
+          unit_of_measurement: sec
+      default: 0.5
+    delay_time_closing:
+      name: Slave close delay time
+      description: Delay time to activate slave when master above mid high (default=5)
+      selector:
+        number:
+          min: 0
+          max: 30
+          step: 1
+          mode: slider
+          unit_of_measurement: sec
+      default: 5
+
+mode: restart
+max_exceeded: silent
+
+fields:
+  position:
+    name: Position
+    description: Target position
+    example: 90
+    required: true
+    selector:
+      number:
+        min: 0
+        max: 100
+        mode: slider
+  stop:
+    name: Stop action
+    description: Stops the cover movement
+    example: false
+    required: false
+    selector:
+      boolean:
+
+variables:
+  # positions: closed = 0 | open = 100
+  # initial value for fields
+  position: 0
+  stop: false
+  # entity_id
+  cover_id_master: !input cover_id_master
+  cover_id_slave: !input cover_id_slave
+  # position
+  position_master_mid_low: !input position_master_mid_low
+  position_master_mid_high: !input position_master_mid_high
+  current_position: "{{ state_attr(cover_id_master,'current_position') }}"
+  slave_goto_position: >-
+    {% set foo = (position + ((100 - position_master_mid_low) * 0.60))|float(0) |round(0) %}
+    {% if (foo < 0) or (position <= position_master_mid_high) %}
+      0
+    {% elif foo > 100 %}
+      100
+    {% else %}
+      {{ foo }}
+    {% endif %}
+  # delay time
+  delay_time_opening: !input delay_time_opening
+  delay_time_closing: !input delay_time_closing
+  slave_delay_time_closing: >-
+    {% if current_position > position_master_mid_low %}
+      {% set foo = ((current_position - position_master_mid_low) * (delay_time_closing / (100 - position_master_mid_low)))|float(0) |round(1) %}
+      {{ iif(foo < 0,0,foo) }}
+    {% else %}
+      0
+    {% endif %}
+
+sequence:
+  - if:
+      - condition: template
+        value_template: "{{ stop == true }}"
+    then:
+      # stop action
+      - service: cover.stop_cover
+        target:
+          entity_id:
+            - !input cover_id_master
+            - !input cover_id_slave
+    else:
+      - if:
+          - condition: template
+            value_template: "{{ position > current_position }}"
+        then:
+          # opening
+          - if:
+              - condition: template
+                value_template: "{{ current_position < 2 }}"
+            then:
+              - service: cover.set_cover_position
+                target:
+                  entity_id: !input cover_id_master
+                data:
+                  position: "{{ position }}"
+              - delay:
+                  seconds: "{{ delay_time_opening }}"
+              - service: cover.set_cover_position
+                target:
+                  entity_id: !input cover_id_slave
+                data:
+                  position: "{{ slave_goto_position }}"
+            else:
+              - service: cover.set_cover_position
+                target:
+                  entity_id: !input cover_id_master
+                data:
+                  position: "{{ position }}"
+              - service: cover.set_cover_position
+                target:
+                  entity_id: !input cover_id_slave
+                data:
+                  position: "{{ slave_goto_position }}"
+        else:
+          # closing
+          - if:
+              - condition: template
+                value_template: "{{ state_attr(cover_id_master,'current_position') > position_master_mid_low }}"
+            then:
+              - service: cover.set_cover_position
+                data:
+                  position: "{{ position }}"
+                target:
+                  entity_id: !input cover_id_master
+              - delay:
+                  seconds: "{{ slave_delay_time_closing }}"
+              - service: cover.set_cover_position
+                data:
+                  position: "{{ slave_goto_position }}"
+                target:
+                  entity_id: !input cover_id_slave
+            else:
+              # close cover without delay
+              - if:
+                  - condition: template
+                    value_template: "{{ position <= position_master_mid_high }}"
+                then:
+                  - service: cover.set_cover_position
+                    data:
+                      position: "{{ position }}"
+                    target:
+                      entity_id: !input cover_id_master
+                  # when a error occured and not fully closed
+                  - service: cover.set_cover_position
+                    target:
+                      entity_id: !input cover_id_slave
+                    data:
+                      position: 0
+                else:
+                  - service: cover.set_cover_position
+                    data:
+                      position: "{{ position }}"
+                    target:
+                      entity_id: !input cover_id_master
+                  - service: cover.set_cover_position
+                    data:
+                      position: "{{ slave_goto_position }}"
+                    target:
+                      entity_id: !input cover_id_slave
