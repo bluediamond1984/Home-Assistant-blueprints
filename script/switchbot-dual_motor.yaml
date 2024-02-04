@@ -76,6 +76,7 @@ fields:
         min: 0
         max: 100
         mode: slider
+        unit_of_measurement: "%"
   stop:
     name: Stop action
     description: Stops the cover movement
