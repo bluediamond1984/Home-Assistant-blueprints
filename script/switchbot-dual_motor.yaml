@@ -164,6 +164,7 @@ sequence:
               - condition: template
                 value_template: "{{ state_attr(cover_id_master,'current_position') > position_master_mid_low }}"
             then:
+              # close cover with delay
               - service: cover.set_cover_position
                 data:
                   position: "{{ position }}"
@@ -182,6 +183,7 @@ sequence:
                   - condition: template
                     value_template: "{{ position <= position_master_mid_high }}"
                 then:
+                  # close slave fully
                   - service: cover.set_cover_position
                     data:
                       position: "{{ position }}"
@@ -194,6 +196,7 @@ sequence:
                     data:
                       position: 0
                 else:
+                  # slave goto position
                   - service: cover.set_cover_position
                     data:
                       position: "{{ position }}"
