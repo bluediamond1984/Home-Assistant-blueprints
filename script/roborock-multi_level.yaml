@@ -1,0 +1,201 @@
+blueprint:
+  name: Roborock Multi Level
+  description: Create single level script with room numbers
+  author: BlueDiamond
+  domain: script
+
+  input:
+    floor_number:
+      name: Floor number
+      description: The number of the floor on which the rooms are
+      selector:
+        text:
+      default: "0"
+    room_id:
+      name: Room numbers
+      description: |
+        List of rooms (label as string, value as string) to populate the selector entity.
+        When floor has one room make value \"\"
+        - label: <name>
+          value: "<number>"
+      selector:
+        object:
+    vacuum_id:
+      name: Vacuum target
+      description: What should this service use as targeted entity
+      selector:
+        entity:
+          filter:
+            domain: vacuum
+    vacuum_mop_intensity_id:
+      name: Mop intensity
+      description: Entity for mopping
+      selector:
+        entity:
+          filter:
+            integration: roborock
+            domain: select
+    vacuum_mop_mode_id:
+      name: Mop mode
+      description: Entity for mop mode
+      selector:
+        entity:
+          filter:
+            integration: roborock
+            domain: select
+
+mode: restart
+max_exceeded: silent
+
+fields:
+  rooms:
+    name: Area
+    description: Select rooms to clean
+    selector:
+      select:
+        options: !input room_id
+        multiple: true
+    required: true
+  fan_speed:
+    name: Vacuum intensity
+    description: Set suction power (default = balanced)
+    selector:
+      select:
+        options:
+          - label: "Off"
+            value: "off"
+          - label: Quiet
+            value: quiet
+          - label: Balanced
+            value: balanced
+          - label: Turbo
+            value: turbo
+          - label: Max
+            value: max
+          - label: Custom
+            value: custom
+          - label: Max plus
+            value: max plus
+        mode: dropdown
+    default: balanced
+    required: true
+  mop:
+    name: Mop intensity
+    description: Set mop intensity (default = off)
+    selector:
+      select:
+        options:
+          - label: "Off"
+            value: "off"
+          - label: Low
+            value: low
+          - label: Medium
+            value: medium
+          - label: High
+            value: high
+        mode: dropdown
+    default: "off"
+    required: true
+  mop_mode:
+    name: Mop mode
+    description: How hard you would like your vacuum to mop
+    selector:
+      select:
+        options:
+          - label: Standard
+            value: standard
+          - label: Deep
+            value: deep
+          - label: Deep+
+            value: deep_plus
+          - label: Fast
+            value: fast
+        mode: dropdown
+    required: false
+
+variables:
+  floor_number: !input floor_number
+
+sequence:
+  - alias: Stop when no room is selected
+    if:
+      - condition: template
+        value_template: "{{ rooms == null }}"
+    then:
+      - service: system_log.write
+        data:
+          level: warning
+          message: No room selected
+          logger: Roborock multi level script
+      - stop: No room selected
+  - alias: Define default values
+    variables:
+      fan_speed: |
+        {% if fan_speed == null %}
+          balanced
+        {% else %}
+          {{ fan_speed }}
+        {% endif %}
+      mop: |
+        {% if mop == null %}
+          off
+        {% else %}
+          {{ mop }}
+        {% endif %}
+  - alias: Load floormap
+    service: vacuum.send_command
+    target:
+      entity_id: !input vacuum_id
+    data:
+      command: load_multi_map
+      params: "{{ floor_number }}"
+  - alias: Delay for loading floormap Roborock
+    delay:
+      hours: 0
+      minutes: 0
+      seconds: 6
+      milliseconds: 0
+  - alias: Set mop intensity
+    service: select.select_option
+    target:
+      entity_id: !input vacuum_mop_intensity_id
+    data:
+      option: "{{ mop }}"
+  - alias: Only set mop_mode when selected
+    if:
+      - condition: template
+        value_template: "{{ mop_mode != null }}"
+    then:
+      - alias: Set mop_mode user input
+        service: select.select_option
+        target:
+          entity_id: !input vacuum_mop_mode_id
+        data:
+          option: "{{ mop_mode }}"
+  - alias: Set fan speed
+    service: vacuum.set_fan_speed
+    target:
+      entity_id: !input vacuum_id
+    data:
+      fan_speed: "{{ fan_speed }}"
+  - alias: When floor has 1 room, then alternative launch
+    if:
+      - condition: template
+        value_template: "{{ iif (rooms|list|count == 1 and rooms[0] == '',true,false) }}"
+    then:
+      - alias: Start vacuum when floor has 1 room
+        service: vacuum.start
+        target:
+          entity_id: !input vacuum_id
+    else:
+      - alias: Clean selected rooms
+        service: vacuum.send_command
+        target:
+          entity_id: !input vacuum_id
+        data:
+          command: app_segment_clean
+          params:
+            - segments: |-
+                [{%- for room in rooms %}{{ room|int }},
+                {%- endfor %}]
+              repeat: 1
