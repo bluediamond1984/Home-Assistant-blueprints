@@ -3,14 +3,23 @@ blueprint:
   description: Create single level script with room numbers
   author: BlueDiamond
   domain: script
+  homeassistant:
+    min_version: 2024.8.1
 
   input:
-    floor_number:
-      name: Floor number
-      description: The number of the floor on which the rooms are
+    map:
+      name: Floor entity
+      description: The floor entity to select the floor level
+      selector:
+        entity:
+          filter:
+            integration: roborock
+            domain: select
+    map_name:
+      name: Floor name
+      description: The floorname corresponding to the room numbers
       selector:
         text:
-      default: "0"
     room_id:
       name: Room numbers
       description: |
@@ -113,16 +122,13 @@ fields:
         mode: dropdown
     required: false
 
-variables:
-  floor_number: !input floor_number
-
 sequence:
   - alias: Stop when no room is selected
     if:
       - condition: template
         value_template: "{{ rooms == null }}"
     then:
-      - service: system_log.write
+      - action: system_log.write
         data:
           level: warning
           message: No room selected
@@ -143,12 +149,11 @@ sequence:
           {{ mop }}
         {% endif %}
   - alias: Load floormap
-    service: vacuum.send_command
+    action: select.select_option
     target:
-      entity_id: !input vacuum_id
+      entity_id: !input map
     data:
-      command: load_multi_map
-      params: "{{ floor_number }}"
+      option: !input map_name
   - alias: Delay for loading floormap Roborock
     delay:
       hours: 0
@@ -156,7 +161,7 @@ sequence:
       seconds: 6
       milliseconds: 0
   - alias: Set mop intensity
-    service: select.select_option
+    action: select.select_option
     target:
       entity_id: !input vacuum_mop_intensity_id
     data:
@@ -167,13 +172,13 @@ sequence:
         value_template: "{{ mop_mode != null }}"
     then:
       - alias: Set mop_mode user input
-        service: select.select_option
+        action: select.select_option
         target:
           entity_id: !input vacuum_mop_mode_id
         data:
           option: "{{ mop_mode }}"
   - alias: Set fan speed
-    service: vacuum.set_fan_speed
+    action: vacuum.set_fan_speed
     target:
       entity_id: !input vacuum_id
     data:
@@ -184,12 +189,12 @@ sequence:
         value_template: "{{ iif (rooms|list|count == 1 and rooms[0] == '',true,false) }}"
     then:
       - alias: Start vacuum when floor has 1 room
-        service: vacuum.start
+        action: vacuum.start
         target:
           entity_id: !input vacuum_id
     else:
       - alias: Clean selected rooms
-        service: vacuum.send_command
+        action: vacuum.send_command
         target:
           entity_id: !input vacuum_id
         data:
