@@ -1,0 +1,39 @@
+blueprint:
+  name: Cover close window
+  description: When window is open, then automation is enabled, else the cover will be closed and the automation disabled
+  author: BlueDiamond
+  domain: automation
+  input:
+    window_target:
+      name: "Window entity"
+      selector:
+        entity:
+          domain: binary_sensor
+    cover_target:
+      name: "Cover entity"
+      selector:
+        entity:
+          domain: cover
+mode: restart
+max_exceeded: silent
+
+triggers:
+  - trigger: state
+    entity_id: !input window_target
+    to: "off"
+actions:
+  - if:
+      - condition: state
+        entity_id: !input window_target
+        state: "on"
+    then:
+      - action: automation.turn_on
+        target:
+          entity_id: "{{ this.entity_id }}"
+    else:
+      - action: cover.close_cover
+        target:
+          entity_id: !input cover_target
+      - action: automation.turn_off
+        target:
+          entity_id: "{{ this.entity_id }}"
