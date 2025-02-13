@@ -118,6 +118,14 @@ variables:
     {% endif %}
 
 sequence:
+  # debug
+  # - service: notify.persistent_notification
+  #   data:
+  #     title: SwitchBot script
+  #     # message: current_position ({{ current_position}}), Delay_time_opening ({{ delay_time_opening }}), Delay_time_closing ({{ slave_delay_time_closing }})
+  #     message: position ({{ position }}), slave goto position ({{slave_goto_position}})
+  # - stop: ""
+
   - if:
       - condition: template
         value_template: "{{ stop == true }}"
@@ -138,6 +146,12 @@ sequence:
               - condition: template
                 value_template: "{{ current_position < 2 }}"
             then:
+              # debug
+              # - service: notify.persistent_notification
+              #   data:
+              #     title: SwitchBot script
+              #     message: Opening (<2) position ({{ position }}), Slave goto position ({{ slave_goto_position }})
+
               - service: cover.set_cover_position
                 target:
                   entity_id: !input cover_id_master
@@ -151,6 +165,12 @@ sequence:
                 data:
                   position: "{{ slave_goto_position }}"
             else:
+              # debug
+              # - service: notify.persistent_notification
+              #   data:
+              #     title: SwitchBot script
+              #     message: Opening position ({{ position }}), Slave goto position ({{ slave_goto_position }})
+
               - service: cover.set_cover_position
                 target:
                   entity_id: !input cover_id_master
@@ -168,6 +188,12 @@ sequence:
                 value_template: "{{ state_attr(cover_id_master,'current_position') > position_master_mid_low }}"
             then:
               # close cover with delay
+              # debug
+              # - service: notify.persistent_notification
+              #   data:
+              #     title: SwitchBot script
+              #     message: Close with delay ({{ slave_delay_time_closing }}), position ({{ position }}), master position ({{ state_attr(cover_id_master,'current_position') }}), slave goto position ({{ slave_goto_position }})
+            
               - service: cover.set_cover_position
                 data:
                   position: "{{ position }}"
@@ -187,6 +213,12 @@ sequence:
                     value_template: "{{ position <= position_master_mid_high }}"
                 then:
                   # close slave fully
+                  # debug
+                  # - service: notify.persistent_notification
+                  #   data:
+                  #     title: SwitchBot script
+                  #     message: Close without delay, position ({{ position }}), slave goto position (0=auto)
+
                   - service: cover.set_cover_position
                     data:
                       position: "{{ position }}"
@@ -200,6 +232,12 @@ sequence:
                       position: 0
                 else:
                   # slave goto position
+                  # debug
+                  # - service: notify.persistent_notification
+                  #   data:
+                  #     title: SwitchBot script
+                  #     message: Close without delay, position ({{ position }}), slave goto position ({{ slave_goto_position }})
+
                   - service: cover.set_cover_position
                     data:
                       position: "{{ position }}"
