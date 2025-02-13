@@ -1,0 +1,8 @@
+*
+!.gitignore
+!automation/
+!automation/*.*
+!script/
+!script/*.*
+!template/
+!template/*.*
