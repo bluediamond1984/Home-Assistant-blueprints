@@ -1,0 +1,65 @@
+blueprint:
+  name: Renew SSL
+  description: Renew SSL certificate and restart Home Assistant for activation
+  homeassistant:
+    min_version: 2025.7.0
+  author: BlueDiamond
+  domain: automation
+  
+  input:
+    ssl_lifetime_entity:
+      name: Sensor SSL certificate expiry
+      description: Populated by Certificate Expiry integration
+      selector:
+        entity:
+          filter:
+            - integration: cert_expiry
+    addon_entity:
+      name: Let's encrypt add-on
+      default: core_letsencrypt
+      selector:
+        addon:
+    remaining_days:
+      name: Days left until the end of life
+      default: 20
+      selector:
+        number:
+          min: 1
+          max: 30
+          step: 1
+          unit_of_measurement: d
+          mode: slider
+    restart_time:
+      name: Daily check
+      description: For renewal SSL and restart system
+      default: 05:00:00
+      selector:
+        time:
+
+mode: restart
+max_exceeded: silent
+
+variables:
+  remaining_days: !input remaining_days
+  ssl_lifetime_entity: !input ssl_lifetime_entity
+  addon_entity: !input addon_entity
+
+triggers:
+  - trigger: time
+    at: !input restart_time
+
+conditions:
+  - condition: template
+    value_template: "{{ (states(ssl_lifetime_entity) | as_datetime - now()).days < remaining_days }}"
+    alias: If lifetime is below remaining days
+
+actions:
+  - action: hassio.addon_start
+    data:
+      addon: "{{ addon_entity }}"
+  - delay:
+      hours: 0
+      minutes: 10
+      seconds: 0
+      milliseconds: 0
+  - action: homeassistant.restart
