@@ -83,7 +83,7 @@ action:
   - service: notify.window
     data:
       title: 'Herinnering: raam open'
-      message: "{{ states[window_entity].name }} sluiten om energie te besparen"
+      message: "{{ area_name(window_entity) }} {{ device_name(window_entity)|lower }} sluiten om energie te besparen"
       # message: "Raam staat nog open"
       data:
         tag: "{{ states[window_entity].entity_id }}"
