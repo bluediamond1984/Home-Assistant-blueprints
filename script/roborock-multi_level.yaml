@@ -4,7 +4,7 @@ blueprint:
   author: BlueDiamond
   domain: script
   homeassistant:
-    min_version: 2024.8.1
+    min_version: 2026.2.0
 
   input:
     map:
@@ -23,10 +23,10 @@ blueprint:
     room_id:
       name: Room numbers
       description: |
-        List of rooms (label as string, value as string) to populate the selector entity.
-        When floor has one room make value \"\"
-        - label: <name>
-          value: "<number>"
+        List of areas on this floor to populate the selector entity:
+        \- label: <name>
+        &nbsp;&nbsp;value: <area_name>
+        Map vacuum segments to areas for the vacuum entity. 
       selector:
         object:
     vacuum_id:
@@ -184,24 +184,14 @@ sequence:
       entity_id: !input vacuum_id
     data:
       fan_speed: "{{ fan_speed }}"
-  - alias: When floor has 1 room, then alternative launch
-    if:
-      - condition: template
-        value_template: "{{ iif (rooms|list|count == 1 and rooms[0] == '',true,false) }}"
-    then:
-      - alias: Start vacuum when floor has 1 room
-        action: vacuum.start
-        target:
-          entity_id: !input vacuum_id
-    else:
-      - alias: Clean selected rooms
-        action: vacuum.send_command
-        target:
-          entity_id: !input vacuum_id
-        data:
-          command: app_segment_clean
-          params:
-            - segments: |-
-                [{%- for room in rooms %}{{ room|int }},
-                {%- endfor %}]
-              repeat: 1
+  - alias: Clean selected rooms
+    action: vacuum.clean_area
+    target:
+      entity_id: vacuum.rocky
+    data:
+      cleaning_area_id: |-
+        {% set output = namespace(list=[]) %}
+        {% for room in rooms %}
+        {% set output.list = output.list + [area_id(room)] %}
+        {%- endfor %}
+        {{ output.list }}
